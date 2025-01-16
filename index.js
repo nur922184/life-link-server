@@ -51,7 +51,7 @@ async function run() {
 
 
     const verifyToken = (req, res, next) => {
-      console.log('inside verify token', req.headers.authorization)
+      // console.log('inside verify token', req.headers.authorization)
       if (!req.headers.authorization) {
         return res.status(401).send({ massage: 'unauthorized access' })
       }
@@ -80,6 +80,30 @@ async function run() {
       const result = await BioDataCollection.find().toArray();
       res.send(result)
     })
+   
+    app.post('/biodata', async (req, res) => {
+      const item = req.body
+      const result = await BioDataCollection.insertOne(item);
+      res.send(result)
+  })
+
+  app.get('/biodata/:email', async (req, res) => {
+    const email = req.params.email; // URL থেকে ইমেইল প্যারামিটার গ্রহণ করা
+    try {
+      const biodata = await BioDataCollection.findOne({ email }); // MongoDB থেকে ইমেইল দিয়ে ডাটা খোঁজা
+      if (biodata) {
+        res.status(200).json(biodata); // ডাটা পাঠানো
+      } else {
+        res.status(404).json({ message: 'No biodata found for this email.' }); // যদি ডাটা না পাওয়া যায়
+      }
+    } catch (error) {
+      res.status(500).json({ message: 'Internal Server Error', error }); // সার্ভার এরর হ্যান্ডলিং
+    }
+  });
+  
+
+
+
     app.get('/biodata/:id', async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
@@ -88,7 +112,7 @@ async function run() {
     })
 
     // BioDetails related 
-    app.get('/favorites', async (req, res) => {
+    app.get('/favorites', verifyToken, async (req, res) => {
       const email = req.query.email;
       const query = { email: email }
       const result = await BioDetailsCollection.find(query).toArray();
@@ -112,7 +136,7 @@ async function run() {
 
     //user related 
     app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
-      console.log(req.headers)
+      // console.log(req.headers)
       const result = await userCollection.find().toArray();
       res.send(result)
     })
@@ -139,19 +163,25 @@ async function run() {
       res.send(result);
     });
 
-    app.get('/users/admin/:email', verifyToken, verifyAdmin, async (req, res) => {
+    app.get('/users/admin/:email', verifyToken, async (req, res) => {
       const email = req.params.email;
+
+      // Ensure the email matches the decoded token
       if (email !== req.decoded.email) {
-        return res.status(403).send({ massage: 'forbidden access' })
+        return res.status(403).send({ message: 'Forbidden access' });
       }
+
+      // Query the database to check the user role
       const query = { email: email };
       const user = await userCollection.findOne(query);
-      let admin = false;
-      if (user) {
-        admin = user?.role === "admin"
-      }
-      res.send({ admin })
-    })
+
+      // Determine if the user is an admin
+      const admin = user?.role === "admin";
+
+      // Respond with admin status
+      res.send({ admin });
+    });
+
 
 
     app.patch('/users/premium/:id', verifyToken, verifyAdmin, async (req, res) => {
