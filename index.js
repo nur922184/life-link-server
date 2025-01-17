@@ -34,6 +34,7 @@ async function run() {
 
 
 
+
     // medile ware-
     //-------------------------
 
@@ -77,24 +78,58 @@ async function run() {
       res.send({ token })
     })
 
+    // --------------------------
 
-    //biodata related 
-    // app.get('/biodata', async (req, res) => {
-    //   const result = await BioDataCollection.find().toArray();
-    //   res.send(result)
-    // })
+    app.get('/contact-requests', verifyToken, async (req, res) => {
+      try {
+        const email = req.decoded.email; // Ensure the user is authenticated
+        if (!email) {
+          return res.status(400).send({ message: 'User email is required' });
+        }
 
-    // সমস্ত বায়োডাটা লোড করার রাউট
-    // app.get('/biodata', async (req, res) => {
-    //   const email = req.query.email;
+        const query = { userEmail: email }; // Match the logged-in user's email
+        const contactRequests = await BioDetailsCollection.find(query).toArray(); // Replace with your collection name
+        res.status(200).send(contactRequests);
+      } catch (error) {
+        console.error('Error fetching contact requests:', error);
+        res.status(500).send({ message: 'Internal Server Error' });
+      }
+    });
 
-    //   // ফিল্টার তৈরির জন্য একটি কন্ডিশন যোগ করা হচ্ছে
-    //   const query = email ? { email: email } : {};
+    app.delete('/contact-requests/:id', verifyToken, async (req, res) => {
+      try {
+        const id = req.params.id;
 
-    //   // ফিল্টার অনুযায়ী ডাটা রিটার্ন করবে
-    //   const result = await BioDataCollection.find(query).toArray();
-    //   res.send(result);
-    // });
+        if (!ObjectId.isValid(id)) {
+          return res.status(400).send({ message: 'Invalid request ID' });
+        }
+
+        const query = { _id: new ObjectId(id) }; // MongoDB ID format
+        const result = await BioDetailsCollection.deleteOne(query);
+
+        if (result.deletedCount === 0) {
+          return res.status(404).send({ message: 'Contact request not found' });
+        }
+
+        res.status(200).send({ message: 'Contact request deleted successfully' });
+      } catch (error) {
+        console.error('Error deleting contact request:', error);
+        res.status(500).send({ message: 'Internal Server Error' });
+      }
+    });
+
+
+
+
+
+
+
+
+
+
+
+
+    // --------------------------
 
     app.get('/biodata', async (req, res) => {
       const email = req.query.email;
@@ -109,23 +144,23 @@ async function run() {
     app.patch('/biodata/:id', async (req, res) => {
       const { id } = req.params;
       const updates = req.body;
-  
+
       try {
-          const result = await BioDataCollection.updateOne(
-              { _id: new ObjectId(id) },
-              { $set: updates }
-          );
-  
-          if (result.modifiedCount > 0) {
-              res.status(200).send({ message: 'Biodata updated successfully' });
-          } else {
-              res.status(400).send({ error: 'No changes made or update failed' });
-          }
+        const result = await BioDataCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: updates }
+        );
+
+        if (result.modifiedCount > 0) {
+          res.status(200).send({ message: 'Biodata updated successfully' });
+        } else {
+          res.status(400).send({ error: 'No changes made or update failed' });
+        }
       } catch (error) {
-          res.status(500).send({ error: 'Server error' });
+        res.status(500).send({ error: 'Server error' });
       }
-  });
-  
+    });
+
 
 
 
