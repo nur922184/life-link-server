@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 const jwt = require('jsonwebtoken')
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -31,15 +32,13 @@ async function run() {
     const BioDataCollection = client.db('LifeLinkDB').collection('biodata');
     const BioDetailsCollection = client.db('LifeLinkDB').collection('details');
     const userCollection = client.db('LifeLinkDB').collection('users');
+    // const paymentCollection = client.db('LifeLinkDB').collection('payments');
 
 
 
 
     // medile ware-
     //-------------------------
-
-
-
 
     const verifyAdmin = async (req, res, next) => {
       const email = req.decoded.email;
@@ -77,6 +76,94 @@ async function run() {
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '2h' });
       res.send({ token })
     })
+
+    //payment related 
+    app.post('/create-payment-intent', async (req, res) => {
+      try {
+        const { amount } = req.body; // Amount in cents
+
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount,
+          currency: 'usd',
+          payment_method_types: ['card'],
+        });
+
+        res.send({ clientSecret: paymentIntent.client_secret });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ error: 'Payment intent creation failed' });
+      }
+    });
+
+    app.post('/record-payment', async (req, res) => {
+      try {
+        const paymentDetails = req.body;
+        const paymentCollection = client.db('LifeLinkDB').collection('payments');
+
+        const result = await paymentCollection.insertOne(paymentDetails);
+
+        res.send({ success: true, result });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ error: 'Failed to record payment' });
+      }
+    });
+    app.get('/payments', async (req, res) => {
+      try {
+        const email = req.query.email; // Query parameter থেকে ইমেইল নেওয়া
+        const paymentCollection = client.db('LifeLinkDB').collection('payments');
+
+        let query = {};
+        if (email) {
+          query = { email }; // ইমেইল যদি দেওয়া থাকে, তাহলে ফিল্টার করব
+        }
+
+        const payments = await paymentCollection.find(query).toArray(); // ডেটা লোড
+        res.send(payments);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ error: 'Failed to fetch payment data' });
+      }
+    });
+
+    app.delete('/payments/:id', async (req, res) => {
+      try {
+        const id = req.params.id; // URL থেকে আইডি পাওয়া
+        const paymentCollection = client.db('LifeLinkDB').collection('payments');
+
+        const result = await paymentCollection.deleteOne({ _id: new ObjectId(id) }); // MongoDB ObjectId ব্যবহার করা
+        if (result.deletedCount === 1) {
+          res.send({ success: true, message: 'Payment deleted successfully' });
+        } else {
+          res.status(404).send({ success: false, message: 'Payment not found' });
+        }
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ success: false, error: 'Failed to delete payment' });
+      }
+    });
+    app.patch('/payments/:id', async (req, res) => {
+      try {
+        const id = req.params.id;
+        const paymentCollection = client.db('LifeLinkDB').collection('payments');
+    
+        // Update the status to "Approved"
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = { $set: { status: "Approved" } };
+        const result = await paymentCollection.updateOne(filter, updateDoc);
+    
+        if (result.modifiedCount > 0) {
+          res.send({ success: true, message: "Status updated to Approved" });
+        } else {
+          res.send({ success: false, message: "No changes made" });
+        }
+      } catch (error) {
+        console.error("Error updating status:", error);
+        res.status(500).send({ success: false, message: "Internal Server Error" });
+      }
+    });
+    
+
 
     // --------------------------
 
@@ -117,17 +204,6 @@ async function run() {
         res.status(500).send({ message: 'Internal Server Error' });
       }
     });
-
-
-
-
-
-
-
-
-
-
-
 
     // --------------------------
 
