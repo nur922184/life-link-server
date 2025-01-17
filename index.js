@@ -34,7 +34,10 @@ async function run() {
 
 
 
-    // medile ware
+    // medile ware-
+    //-------------------------
+
+
 
 
     const verifyAdmin = async (req, res, next) => {
@@ -76,31 +79,63 @@ async function run() {
 
 
     //biodata related 
+    // app.get('/biodata', async (req, res) => {
+    //   const result = await BioDataCollection.find().toArray();
+    //   res.send(result)
+    // })
+
+    // সমস্ত বায়োডাটা লোড করার রাউট
+    // app.get('/biodata', async (req, res) => {
+    //   const email = req.query.email;
+
+    //   // ফিল্টার তৈরির জন্য একটি কন্ডিশন যোগ করা হচ্ছে
+    //   const query = email ? { email: email } : {};
+
+    //   // ফিল্টার অনুযায়ী ডাটা রিটার্ন করবে
+    //   const result = await BioDataCollection.find(query).toArray();
+    //   res.send(result);
+    // });
+
     app.get('/biodata', async (req, res) => {
-      const result = await BioDataCollection.find().toArray();
-      res.send(result)
-    })
-   
+      const email = req.query.email;
+
+      // যদি `email` থাকে, ফিল্টার করুন। না থাকলে সব ডাটা রিটার্ন করুন।
+      const query = email ? { contactEmail: email } : {};
+
+      const result = await BioDataCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    app.patch('/biodata/:id', async (req, res) => {
+      const { id } = req.params;
+      const updates = req.body;
+  
+      try {
+          const result = await BioDataCollection.updateOne(
+              { _id: new ObjectId(id) },
+              { $set: updates }
+          );
+  
+          if (result.modifiedCount > 0) {
+              res.status(200).send({ message: 'Biodata updated successfully' });
+          } else {
+              res.status(400).send({ error: 'No changes made or update failed' });
+          }
+      } catch (error) {
+          res.status(500).send({ error: 'Server error' });
+      }
+  });
+  
+
+
+
     app.post('/biodata', async (req, res) => {
       const item = req.body
       const result = await BioDataCollection.insertOne(item);
       res.send(result)
-  })
+    })
 
-  app.get('/biodata/:email', async (req, res) => {
-    const email = req.params.email; // URL থেকে ইমেইল প্যারামিটার গ্রহণ করা
-    try {
-      const biodata = await BioDataCollection.findOne({ email }); // MongoDB থেকে ইমেইল দিয়ে ডাটা খোঁজা
-      if (biodata) {
-        res.status(200).json(biodata); // ডাটা পাঠানো
-      } else {
-        res.status(404).json({ message: 'No biodata found for this email.' }); // যদি ডাটা না পাওয়া যায়
-      }
-    } catch (error) {
-      res.status(500).json({ message: 'Internal Server Error', error }); // সার্ভার এরর হ্যান্ডলিং
-    }
-  });
-  
+
 
 
 
