@@ -32,7 +32,6 @@ async function run() {
     const BioDataCollection = client.db('LifeLinkDB').collection('biodata');
     const BioDetailsCollection = client.db('LifeLinkDB').collection('details');
     const userCollection = client.db('LifeLinkDB').collection('users');
-    // const paymentCollection = client.db('LifeLinkDB').collection('payments');
 
 
 
@@ -142,20 +141,64 @@ async function run() {
         res.status(500).send({ success: false, error: 'Failed to delete payment' });
       }
     });
+
+    // app.patch('/payments/:id', async (req, res) => {
+    //   try {
+    //     const id = req.params.id;
+    //     const paymentCollection = client.db('LifeLinkDB').collection('payments');
+    
+    //     // Update the status to "Approved"
+    //     const filter = { _id: new ObjectId(id) };
+    //     const updateDoc = { $set: { status: "Approved" } };
+    //     const result = await paymentCollection.updateOne(filter, updateDoc);
+    
+    //     if (result.modifiedCount > 0) {
+    //       res.send({ success: true, message: "Status updated to Approved" });
+    //     } else {
+    //       res.send({ success: false, message: "No changes made" });
+    //     }
+    //   } catch (error) {
+    //     console.error("Error updating status:", error);
+    //     res.status(500).send({ success: false, message: "Internal Server Error" });
+    //   }
+    // });
+
     app.patch('/payments/:id', async (req, res) => {
       try {
         const id = req.params.id;
-        const paymentCollection = client.db('LifeLinkDB').collection('payments');
+        const status = req.body.status || "Premium"; // Default status to "Approved"
+        const collections = [
+          client.db('LifeLinkDB').collection('payments'),
+          client.db('LifeLinkDB').collection('biodata'),
+          client.db('LifeLinkDB').collection('favorites'),
+        ];
     
-        // Update the status to "Approved"
-        const filter = { _id: new ObjectId(id) };
-        const updateDoc = { $set: { status: "Approved" } };
-        const result = await paymentCollection.updateOne(filter, updateDoc);
+        let updates = [];
     
-        if (result.modifiedCount > 0) {
-          res.send({ success: true, message: "Status updated to Approved" });
+        for (const collection of collections) {
+          const filter = { _id: new ObjectId(id) };
+          const updateDoc = { $set: { status } };
+          const result = await collection.updateOne(filter, updateDoc);
+    
+          // Collect the result for reporting
+          updates.push({ collectionName: collection.collectionName, modifiedCount: result.modifiedCount });
+        }
+    
+        // Check if any updates were made
+        const totalModified = updates.reduce((sum, item) => sum + item.modifiedCount, 0);
+    
+        if (totalModified > 0) {
+          res.send({
+            success: true,
+            message: `Status updated to ${status} in ${totalModified} document(s).`,
+            updates,
+          });
         } else {
-          res.send({ success: false, message: "No changes made" });
+          res.send({
+            success: false,
+            message: "No matching documents found in any collection.",
+            updates,
+          });
         }
       } catch (error) {
         console.error("Error updating status:", error);
@@ -166,44 +209,6 @@ async function run() {
 
 
     // --------------------------
-
-    app.get('/contact-requests', verifyToken, async (req, res) => {
-      try {
-        const email = req.decoded.email; // Ensure the user is authenticated
-        if (!email) {
-          return res.status(400).send({ message: 'User email is required' });
-        }
-
-        const query = { userEmail: email }; // Match the logged-in user's email
-        const contactRequests = await BioDetailsCollection.find(query).toArray(); // Replace with your collection name
-        res.status(200).send(contactRequests);
-      } catch (error) {
-        console.error('Error fetching contact requests:', error);
-        res.status(500).send({ message: 'Internal Server Error' });
-      }
-    });
-
-    app.delete('/contact-requests/:id', verifyToken, async (req, res) => {
-      try {
-        const id = req.params.id;
-
-        if (!ObjectId.isValid(id)) {
-          return res.status(400).send({ message: 'Invalid request ID' });
-        }
-
-        const query = { _id: new ObjectId(id) }; // MongoDB ID format
-        const result = await BioDetailsCollection.deleteOne(query);
-
-        if (result.deletedCount === 0) {
-          return res.status(404).send({ message: 'Contact request not found' });
-        }
-
-        res.status(200).send({ message: 'Contact request deleted successfully' });
-      } catch (error) {
-        console.error('Error deleting contact request:', error);
-        res.status(500).send({ message: 'Internal Server Error' });
-      }
-    });
 
     // --------------------------
 
