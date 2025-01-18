@@ -146,12 +146,12 @@ async function run() {
     //   try {
     //     const id = req.params.id;
     //     const paymentCollection = client.db('LifeLinkDB').collection('payments');
-    
+
     //     // Update the status to "Approved"
     //     const filter = { _id: new ObjectId(id) };
     //     const updateDoc = { $set: { status: "Approved" } };
     //     const result = await paymentCollection.updateOne(filter, updateDoc);
-    
+
     //     if (result.modifiedCount > 0) {
     //       res.send({ success: true, message: "Status updated to Approved" });
     //     } else {
@@ -172,21 +172,21 @@ async function run() {
           client.db('LifeLinkDB').collection('biodata'),
           client.db('LifeLinkDB').collection('favorites'),
         ];
-    
+
         let updates = [];
-    
+
         for (const collection of collections) {
           const filter = { _id: new ObjectId(id) };
           const updateDoc = { $set: { status } };
           const result = await collection.updateOne(filter, updateDoc);
-    
+
           // Collect the result for reporting
           updates.push({ collectionName: collection.collectionName, modifiedCount: result.modifiedCount });
         }
-    
+
         // Check if any updates were made
         const totalModified = updates.reduce((sum, item) => sum + item.modifiedCount, 0);
-    
+
         if (totalModified > 0) {
           res.send({
             success: true,
@@ -205,7 +205,7 @@ async function run() {
         res.status(500).send({ success: false, message: "Internal Server Error" });
       }
     });
-    
+
 
 
     // --------------------------
@@ -352,6 +352,36 @@ async function run() {
       res.send(result);
     })
 
+
+    //admin details 
+    app.get("/dashboard", async (req, res) => {
+      try {
+        // Query counts and revenue
+        const totalBiodataCount = await BioDataCollection.countDocuments();
+        const maleBiodataCount = await BioDataCollection.countDocuments({ type: "Male" });
+        const femaleBiodataCount = await BioDataCollection.countDocuments({ type: "Female" });
+        const premiumBiodataCount = await BioDataCollection.countDocuments({ status: "Premium" });
+
+        const totalRevenue = await userCollection.aggregate([
+          { $match: { paymentStatus: "Completed" } }, // Filter only completed payments
+          { $group: { _id: null, totalRevenue: { $sum: "$amount" } } },
+        ]).toArray();
+
+        // Prepare response
+        const dashboardData = {
+          totalBiodataCount,
+          maleBiodataCount,
+          femaleBiodataCount,
+          premiumBiodataCount,
+          totalRevenue: totalRevenue[0]?.totalRevenue || 0,
+        };
+
+        res.status(200).json(dashboardData);
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+        res.status(500).json({ error: "Failed to fetch dashboard data." });
+      }
+    });
 
 
 
