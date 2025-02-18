@@ -26,7 +26,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    // await client.connect();
+    await client.connect();
     // Send a ping to confirm a successful connection
 
     const BioDataCollection = client.db('LifeLinkDB').collection('biodata');
@@ -276,11 +276,31 @@ async function run() {
 
 
     //user related 
-    app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
+    app.get('/users',  async (req, res) => {
       // console.log(req.headers)
       const result = await userCollection.find().toArray();
       res.send(result)
     })
+    app.get('/users', async (req, res) => {
+      try {
+          const email = req.query.email; // URL থেকে ইমেইল নেওয়া
+          if (!email) {
+              return res.status(400).send({ message: "Email query parameter is required" });
+          }
+  
+          const user = await userCollection.findOne({ email: email }); // নির্দিষ্ট ইউজার খোঁজা
+  
+          if (!user) {
+              return res.status(404).send({ message: "User not found" });
+          }
+  
+          res.send(user);
+      } catch (error) {
+          console.error("Error fetching user:", error);
+          res.status(500).send({ message: "Internal server error" });
+      }
+  });
+  
 
     app.post('/users', async (req, res) => {
       const user = req.body;
@@ -373,8 +393,8 @@ async function run() {
     });
 
 
-    // await client.db("admin").command({ ping: 1 });
-    // console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    await client.db("admin").command({ ping: 1 });
+    console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
